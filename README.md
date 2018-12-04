@@ -3,7 +3,7 @@
 ## Docs about setting-up this project and folders structure of mechanism
 
 1. Setting-up steps:
-    - clone project, run build.sh shell that will build docker image based on Dockerfile
+    - clone project
     - run build.sh shell that will build docker image based on Dockerfile and auto run Crawler with parameter 2 for cpu
     - docker run -it --rm --name jobsh -v "$PWD":/usr/src/app -w /usr/src/app node:11 node run.js `CPU`
 
