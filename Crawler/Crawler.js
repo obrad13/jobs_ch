@@ -25,110 +25,70 @@ class Crawler extends  JobsCh{
     }
 
 
-    Run(start,end, date){
-        let that=this,first_page=1;
-        return new Promise((resolve)=>{
-            (function loop(i) {
-                if(i+start>end){
-                    console.log('Crawler finished');
-                    return resolve();
-                }
-                let date_from=moment(date).subtract(i, "day").format("YYYY-MM-DD HH:mm:ss");
-                let date_to = moment(date).subtract(i+1, "day").format("YYYY-MM-DD HH:mm:ss");
-                let url = that.date_url.replace('%spage%',first_page).replace('%stringfrom%',encodeURI(date_to)).replace('%stringto%',encodeURI(date_from));
-                console.log(url);
-                that.Request.get(url,async function (err,res,body) {
-                    if(!err){
-                        let bodyJson = JSON.parse(body);
-                        let pages = bodyJson['num_pages'];
-                        await that.RunEachDate(url,body,pages);
-                        return loop(++i);
-                    }else {
-                        console.log(err);
-                        return loop(++i);
-                    }
-                })
-
-            })(0)
-        })
-
-
-    }
-
-
-
-    RunEachDate(url,body,pages){
-        let that = this;
-        return new Promise((resolve)=>{
-            if(parseInt(pages)==1){
-                that.SingleJob(body);
-                return resolve('done');
-            }else if(parseInt(pages)==0){
-                return resolve('done');
-            }
-            else{
-                (function loop(i) {
-                    if(i===parseInt(pages)){
-                        return resolve('done');
-                    }
-                    console.log(url.replace('?page=1','?page='+i),pages,i);
-                    that.Request.get(url.replace('?page=1','?page='+i),async function (err,res,body) {
-                        if(!err){
-                            await that.SingleJob(body);
-                            return loop(++i);
-
-                        }else{
-                            return loop(++i);
-                        }
-                    })
-
-                })(2)
-            }
-
-        })
-
-    }
-
-
-
-    SingleJob(body){
-        let that=this,job_id;
-        let object = JSON.parse(body),object_product={};
-        return new Promise((resolve)=>{
-            if(object){
-                for(let job of object['documents']){
-                    that.Request.get(that.job_url+job['job_id'],function (err,res,body) {
-                        if(!err){
-                            that.JsonProduct(job['job_id'],body);
-                        }else{
-                            console.log(err);
-                        }
-                    })
-                }
-            }
-            resolve('done')
-
-        }).catch((err)=>{
-            console.log(err,job_id,object);
-        })
-
-    }
-
-
-    JsonProduct(job_id,body){
-        let that=this,object={};
-        let job = JSON.parse(body);
-        fs.readFile(__dirname+'/../Products_Data/jobs.json',(err,content)=>{
-            fs.appendFile(__dirname+'/../Products_Data/jobs.json',JSON.stringify(job)+'\n',(err)=>{
-                if (err) {
-                    console.error(err);
-                    return;
-                }
-                console.log("Job:"+job_id+"is saved!");
+    request(url){
+        return new Promise((resolve, reject) => {
+            this.Request.get(url, (err, res, body) => {
+                if(err)
+                    reject(err);
+                resolve(body);
             })
         })
+    }
 
 
+    async Run(start, end, date,worker_id){
+        let first_page = 1;
+        for(let i = 0; i + start <= end; i++){
+            let date_from = moment(date).subtract(i, "day").format("YYYY-MM-DD HH:mm:ss");
+            let date_to = moment(date).subtract(i+1, "day").format("YYYY-MM-DD HH:mm:ss");
+            let url = this.date_url.replace('%spage%',first_page).replace('%stringfrom%',encodeURI(date_to)).replace('%stringto%',encodeURI(date_from));
+            console.log(url);
+            let body = await this.request(url);
+            let bodyJson = JSON.parse(body);
+            let pages = bodyJson['num_pages'];
+            await this.RunEachDate(url,body,pages,worker_id);
+        }
+    }
+
+    async RunEachDate(url, body, pages,worker_id){
+        if(parseInt(pages) === 1){
+            await this.SingleJob(body,worker_id);
+            return 0;
+        }
+        else if(parseInt(pages) === 0){
+            return 0;
+        }
+        else{
+            for(let i = 1; i <= parseInt(pages); i++){
+                console.log(url.replace('?page=1', `?page=${i}`));
+                let body = await this.request(url.replace('?page=1', `?page=${i}`));
+                await this.SingleJob(body,worker_id)
+            }
+        }
+    }
+
+
+
+    async SingleJob(body,worker_id){
+        let object = JSON.parse(body);
+        if(object){
+            for(let job of object.documents){
+                let body = await this.request(this.job_url + job.job_id);
+                this.JsonProduct(job.job_id, body,worker_id);
+            }
+        }
+    }
+
+
+    JsonProduct(job_id, body,worker_id){
+        let job = JSON.parse(body);
+        try{
+            fs.appendFileSync(`${__dirname}/../Products_Data/jobs${worker_id}.json`, `${JSON.stringify(job)}\n`);
+            console.log(`Job: ${job_id} is saved!"`);
+        }
+        catch(err){
+            console.log(err);
+        }
     }
 
 
