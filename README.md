@@ -50,4 +50,4 @@ This folder can contain one Json file for all crawled products, and newly create
 `node run.js 5`
 
 ## Run simple test for current day with:
-`node scrape.test.js`
+`scrape.test.js`
