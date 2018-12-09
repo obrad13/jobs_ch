@@ -33,33 +33,29 @@ class Worker{
         let diff =moment(this.today).subtract(1, "year").format("YYYY-MM-DD HH:mm:ss");
         let b = moment(diff);
         let days = a.diff(b,'days');
-        if(global.TYPE ==='TEST'){
-            await this.StartInstance.Run(this.clusters,1,this.today,"Test_File");
-            this.gzip("Test_File");
-        }else{
-            if(this.clusters>1){
-                if(cluster.isMaster){
-                    console.log(`Master ${process.pid} is running`);
-                    for(let cpu=1;cpu<=this.clusters;cpu++){
-                        cluster.fork();
-                    }
-                    cluster.on('exit', (worker, code, signal) => {
-                        console.log(`worker ${worker.process.pid} died`);
-                    });
-                }else {
-                    let crawler_instance = this.createRanges(this.clusters,days,this.today);
-                    crawler_instance.map(async (instance, i) => {
-                        if(cluster.worker.id === i + 1){
-                            await this.StartInstance.Run(instance.start, instance.end, instance.date,cluster.worker.id);
-                            this.gzip(cluster.worker.id)
-                        }
-                    })
-                    console.log(`Worker ${process.pid} started`);
+
+        if(this.clusters>1){
+            if(cluster.isMaster){
+                console.log(`Master ${process.pid} is running`);
+                for(let cpu=1;cpu<=this.clusters;cpu++){
+                    cluster.fork();
                 }
-            }else{
-                await this.StartInstance.Run(this.clusters,days,this.today,"Single_File");
-                this.gzip("Single_File");
+                cluster.on('exit', (worker, code, signal) => {
+                    console.log(`worker ${worker.process.pid} died`);
+                });
+            }else {
+                let crawler_instance = this.createRanges(this.clusters,days,this.today);
+                crawler_instance.map(async (instance, i) => {
+                    if(cluster.worker.id === i + 1){
+                        await this.StartInstance.Run(instance.start, instance.end, instance.date,cluster.worker.id);
+                        this.gzip(cluster.worker.id)
+                    }
+                })
+                console.log(`Worker ${process.pid} started`);
             }
+        }else{
+            await this.StartInstance.Run(this.clusters,days,this.today,"Single_File");
+                this.gzip();
         }
 
     }
